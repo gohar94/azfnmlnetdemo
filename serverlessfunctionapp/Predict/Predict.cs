@@ -15,10 +15,13 @@ namespace Predict
     {
         [FunctionName("Predict")]
         public static IActionResult Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)]HttpRequest req,
             [Blob("models/model.zip", FileAccess.Read, Connection = "AzureWebJobsStorage")] Stream serializedModel,
             ILogger log)
         {
+
+             var watch = System.Diagnostics.Stopwatch.StartNew();
+
             // Workaround for Azure Functions Host
             if (typeof(Microsoft.ML.Runtime.Data.LoadTransform) == null ||
                 typeof(Microsoft.ML.Runtime.Learners.LinearClassificationTrainer) == null ||
@@ -39,12 +42,16 @@ namespace Predict
 
             //Load prediction model
             var model = PredictionModel.ReadAsync<IrisData, IrisPrediction>(serializedModel).Result;
+            serializedModel.Close();
 
             //Make prediction
             IrisPrediction prediction = model.Predict(data);
 
+            watch.Stop();
+            string output = "Time taken (ms): " + watch.ElapsedMilliseconds.ToString() + ", Predicted Label: " + prediction.PredictedLabels;
+
             //Return prediction
-            return (IActionResult)new OkObjectResult(prediction.PredictedLabels);
+            return (IActionResult)new OkObjectResult(output);
         }
     }
 }
